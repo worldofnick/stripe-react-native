@@ -550,6 +550,10 @@ export enum CustomPaymentMethodResultStatus {
   Failed = 'failed',
 }
 
+/**
+ * Result object returned when a custom payment method transaction completes.
+ * Contains the transaction status and, in case of failure, an error message.
+ */
 export type CustomPaymentMethodResult =
   | { status: CustomPaymentMethodResultStatus.Completed }
   | { status: CustomPaymentMethodResultStatus.Canceled }
