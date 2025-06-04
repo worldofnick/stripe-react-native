@@ -114,6 +114,10 @@ public abstract class NativeStripeSdkModuleSpec extends ReactContextBaseJavaModu
     invoke("embeddedPaymentElementLoadingFailed", value);
   }
 
+  protected final void emitEmbeddedPaymentElementCustomPaymentMethodConfirm(ReadableMap value) {
+    invoke("embeddedPaymentElementCustomPaymentMethodConfirm", value);
+  }
+
   @ReactMethod
   @DoNotStrip
   public abstract void initialise(ReadableMap params, Promise promise);

@@ -1275,6 +1275,10 @@ class StripeSdkModule(
     // noop, iOS only
   }
 
+  fun emitEmbeddedPaymentElementCustomPaymentMethodConfirm(value: ReadableMap) {
+    super.emitEmbeddedPaymentElementCustomPaymentMethodConfirm(value)
+  }
+
   override fun handleURLCallback(
     url: String,
     promise: Promise,

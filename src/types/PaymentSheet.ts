@@ -45,7 +45,7 @@ export type SetupParamsBase = IntentParams & {
   defaultShippingDetails?: AddressDetails;
   /** If true, allows payment methods that do not move money at the end of the checkout. Defaults to false.
    *
-   * Some payment methods can’t guarantee you will receive funds from your customer at the end of the checkout
+   * Some payment methods can't guarantee you will receive funds from your customer at the end of the checkout
    * because they take time to settle (eg. most bank debits, like SEPA or ACH) or require customer action to
    * complete (e.g. OXXO, Konbini, Boleto). If this is set to true, make sure your integration listens to webhooks
    * for notifications on whether a payment has succeeded or not.
@@ -64,7 +64,7 @@ export type SetupParamsBase = IntentParams & {
    *  You can override the default order in which payment methods are displayed in PaymentSheet with a list of payment method types.
    *  See https://stripe.com/docs/api/payment_methods/object#payment_method_object-type for the list of valid types.  You may also pass external payment methods.
    *  - Example: ["card", "external_paypal", "klarna"]
-   *  - Note: If you omit payment methods from this list, they’ll be automatically ordered by Stripe after the ones you provide. Invalid payment methods are ignored.
+   *  - Note: If you omit payment methods from this list, they'll be automatically ordered by Stripe after the ones you provide. Invalid payment methods are ignored.
    */
   paymentMethodOrder?: Array<String>;
   /** This is an experimental feature that may be removed at any time.
@@ -84,11 +84,13 @@ export type SetupParamsBase = IntentParams & {
    * Note: Card brand filtering is not currently supported in Link.
    */
   cardBrandAcceptance?: CardBrandAcceptance;
+  /** Configuration for custom payment methods in PaymentSheet */
+  customPaymentMethodConfiguration?: CustomPaymentMethodConfiguration;
 };
 
 export type SetupParams =
   | (SetupParamsBase & {
-      /** A short-lived token that allows the SDK to access a Customer’s payment methods. */
+      /** A short-lived token that allows the SDK to access a Customer's payment methods. */
       customerEphemeralKeySecret: string;
       customerSessionClientSecret?: never;
     })
@@ -331,7 +333,7 @@ export type PrimaryButtonColorConfig = {
   border: string;
 };
 
-/** A color that’s either a single hex or a light/dark pair */
+/** A color that's either a single hex or a light/dark pair */
 export type ThemedColor = string | { light: string; dark: string };
 
 /** Represents edge insets */
@@ -524,6 +526,50 @@ export type IntentConfiguration = {
   paymentMethodTypes?: Array<string>;
 };
 
+/**
+ * Configuration for a custom payment method.
+ */
+export interface CustomPaymentMethod {
+  /** The custom payment method ID (beginning with `cpmt_`) as created in your Stripe Dashboard. */
+  id: string;
+  /** Optional subtitle to display beneath the custom payment method name. */
+  subtitle?: string;
+  /** Whether to disable billing detail collection for this custom payment method. Defaults to true. */
+  disableBillingDetailCollection?: boolean;
+}
+
+/**
+ * Custom payment method confirmation result type for PaymentSheet.
+ */
+export type CustomPaymentMethodResult =
+  | { status: 'completed' }
+  | { status: 'canceled' }
+  | { status: 'failed'; error: string };
+
+/**
+ * Callback function called when a custom payment method is selected and confirmed.
+ * Your implementation should complete the payment using your custom payment provider's SDK.
+ */
+export type ConfirmCustomPaymentMethodCallback = (
+  customPaymentMethod: CustomPaymentMethod,
+  billingDetails: BillingDetails,
+  /** 
+   * Call this function with the result of your custom payment method transaction.
+   * @param result The result of the custom payment method confirmation
+   */
+  resultHandler: (result: CustomPaymentMethodResult) => void
+) => void;
+
+/**
+ * Configuration for custom payment methods in PaymentSheet.
+ */
+export interface CustomPaymentMethodConfiguration {
+  /** Array of custom payment methods to display in the Payment Sheet */
+  customPaymentMethods: CustomPaymentMethod[];
+  /** Callback function to handle custom payment method confirmation */
+  confirmCustomPaymentMethodCallback: ConfirmCustomPaymentMethodCallback;
+}
+
 export type Mode = PaymentMode | SetupMode;
 
 /**
@@ -532,7 +578,7 @@ export type Mode = PaymentMode | SetupMode;
 export enum CaptureMethod {
   /** (Default) Stripe automatically captures funds when the customer authorizes the payment. */
   Automatic = 'Automatic',
-  /** Place a hold on the funds when the customer authorizes the payment, but don’t capture the funds until later. (Not all payment methods support this.) */
+  /** Place a hold on the funds when the customer authorizes the payment, but don't capture the funds until later. (Not all payment methods support this.) */
   Manual = 'Manual',
   /** Asynchronously capture funds when the customer authorizes the payment.
   - Note: Recommended over `CaptureMethod.Automatic` due to improved latency, but may require additional integration changes.

@@ -70,13 +70,13 @@ export interface PaymentOptionDisplayData {
  * The embedded view may show payment method options such as "Card". When selected, a form sheet appears
  * for customers to input their payment details. At the bottom of that form sheet is a button.
  * This type determines what tapping that button does:
- * - In the `confirm` case, the button says “Pay” or “Set up” and triggers confirmation of the payment or setup intent inside the sheet.
- * - In the `continue` case, the button says “Continue” and simply dismisses the sheet. The payment or setup is then confirmed outside the sheet, typically in your app.
+ * - In the `confirm` case, the button says "Pay" or "Set up" and triggers confirmation of the payment or setup intent inside the sheet.
+ * - In the `continue` case, the button says "Continue" and simply dismisses the sheet. The payment or setup is then confirmed outside the sheet, typically in your app.
  */
 export type EmbeddedFormSheetAction =
   | {
       /**
-       * The button says “Pay” or “Set up”. When tapped, it confirms the payment or setup directly within the form sheet.
+       * The button says "Pay" or "Set up". When tapped, it confirms the payment or setup directly within the form sheet.
        * @param result - Callback invoked with the result of the confirmation. You can use this to show a success message or handle errors.
        */
       type: 'confirm';
@@ -86,7 +86,7 @@ export type EmbeddedFormSheetAction =
     }
   | {
       /**
-       * The button says “Continue”. When tapped, the form sheet closes without confirming anything.
+       * The button says "Continue". When tapped, the form sheet closes without confirming anything.
        * Use this when you want to handle confirmation elsewhere in your app after the customer has filled in their details.
        */
       type: 'continue';
@@ -100,7 +100,7 @@ export interface EmbeddedPaymentElementConfiguration {
   merchantDisplayName: string;
   /** The identifier of the Stripe Customer object. See https://stripe.com/docs/api/customers/object#customer_object-id */
   customerId?: string;
-  /** A short-lived token that allows the SDK to access a Customer’s payment methods. */
+  /** A short-lived token that allows the SDK to access a Customer's payment methods. */
   customerEphemeralKeySecret?: string;
   /** (Experimental) This parameter can be changed or removed at any time (use at your own risk).
    *  The client secret of this Customer Session. Used on the client to set up secure access to the given customer.
@@ -128,7 +128,7 @@ export interface EmbeddedPaymentElementConfiguration {
   defaultShippingDetails?: AddressDetails;
   /** If true, allows payment methods that do not move money at the end of the checkout. Defaults to false.
    *
-   * Some payment methods can’t guarantee you will receive funds from your customer at the end of the checkout
+   * Some payment methods can't guarantee you will receive funds from your customer at the end of the checkout
    * because they take time to settle (eg. most bank debits, like SEPA or ACH) or require customer action to
    * complete (e.g. OXXO, Konbini, Boleto). If this is set to true, make sure your integration listens to webhooks
    * for notifications on whether a payment has succeeded or not.
@@ -147,7 +147,7 @@ export interface EmbeddedPaymentElementConfiguration {
    *  You can override the default order in which payment methods are displayed in EmbeddedPaymentElement with a list of payment method types.
    *  See https://stripe.com/docs/api/payment_methods/object#payment_method_object-type for the list of valid types.  You may also pass external payment methods.
    *  - Example: ["card", "external_paypal", "klarna"]
-   *  - Note: If you omit payment methods from this list, they’ll be automatically ordered by Stripe after the ones you provide. Invalid payment methods are ignored.
+   *  - Note: If you omit payment methods from this list, they'll be automatically ordered by Stripe after the ones you provide. Invalid payment methods are ignored.
    */
   paymentMethodOrder?: Array<String>;
   /** This is an experimental feature that may be removed at any time.
@@ -162,10 +162,12 @@ export interface EmbeddedPaymentElementConfiguration {
    * Note: Card brand filtering is not currently supported in Link.
    */
   cardBrandAcceptance?: PaymentSheetTypes.CardBrandAcceptance;
-  /** The view can display payment methods like “Card” that, when tapped, open a sheet where customers enter their payment method details.
+  /** The view can display payment methods like "Card" that, when tapped, open a sheet where customers enter their payment method details.
    * The sheet has a button at the bottom. `formSheetAction` controls the action the button performs.
    */
   formSheetAction?: EmbeddedFormSheetAction;
+  /** Configuration for custom payment methods in EmbeddedPaymentElement */
+  customPaymentMethodConfiguration?: PaymentSheetTypes.CustomPaymentMethodConfiguration;
 }
 
 // -----------------------------------------------------------------------------
@@ -209,6 +211,7 @@ class EmbeddedPaymentElement {
 // -----------------------------------------------------------------------------
 let confirmHandlerCallback: EventSubscription | null = null;
 let formSheetActionConfirmCallback: EventSubscription | null = null;
+let customPaymentMethodConfirmCallback: EventSubscription | null = null;
 
 async function createEmbeddedPaymentElement(
   intentConfig: PaymentSheetTypes.IntentConfiguration,
@@ -258,6 +261,34 @@ function setupConfirmHandlers(
         (result: EmbeddedPaymentElementResult) => {
           // Pass the result back to the formSheetAction handler
           confirmFormSheetHandler(result);
+        }
+      );
+    }
+  }
+
+  // Setup custom payment method confirmation handler
+  if (configuration.customPaymentMethodConfiguration) {
+    const customPaymentMethodHandler = configuration.customPaymentMethodConfiguration.confirmCustomPaymentMethodCallback;
+    if (customPaymentMethodHandler) {
+      customPaymentMethodConfirmCallback?.remove();
+      customPaymentMethodConfirmCallback = addListener(
+        'embeddedPaymentElementCustomPaymentMethodConfirm',
+        ({
+          customPaymentMethod,
+          billingDetails,
+        }: {
+          customPaymentMethod: PaymentSheetTypes.CustomPaymentMethod;
+          billingDetails: BillingDetails;
+        }) => {
+          // Call the user's handler with a result handler callback
+          customPaymentMethodHandler(
+            customPaymentMethod,
+            billingDetails,
+            (result: PaymentSheetTypes.CustomPaymentMethodResult) => {
+              // For now, we just call the handler and let the native side handle the flow
+              // In the future, this could be enhanced to send results back to native if needed
+            }
+          );
         }
       );
     }

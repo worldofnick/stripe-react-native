@@ -6,7 +6,7 @@
 //
 
 import Foundation
-@_spi(ExperimentalAllowsRemovalOfLastSavedPaymentMethodAPI) @_spi(CustomerSessionBetaAccess) @_spi(EmbeddedPaymentElementPrivateBeta) @_spi(STP) import StripePaymentSheet
+@_spi(ExperimentalAllowsRemovalOfLastSavedPaymentMethodAPI) @_spi(CustomerSessionBetaAccess) @_spi(EmbeddedPaymentElementPrivateBeta) @_spi(CustomPaymentMethodsBeta) @_spi(STP) import StripePaymentSheet
 
 extension StripeSdkImpl {
     internal func buildPaymentSheetConfiguration(
@@ -39,12 +39,8 @@ extension StripeSdkImpl {
         }
 
         if let linkParams = params["link"] as? NSDictionary {
-            do {
-              let display = StripeSdkImpl.mapToLinkDisplay(value: linkParams["display"] as? String)
-              configuration.link = PaymentSheet.LinkConfiguration(display: display)
-            } catch {
-                return(error: Errors.createError(ErrorType.Failed, error.localizedDescription), configuration: nil)
-            }
+            let display = StripeSdkImpl.mapToLinkDisplay(value: linkParams["display"] as? String)
+            configuration.link = PaymentSheet.LinkConfiguration(display: display)
         }
 
         if let merchantDisplayName = params["merchantDisplayName"] as? String {
@@ -136,6 +132,14 @@ extension StripeSdkImpl {
         }
 
         configuration.cardBrandAcceptance = computeCardBrandAcceptance(params: params)
+
+        // Parse custom payment method configuration
+        if let customPaymentMethodConfig = params["customPaymentMethodConfiguration"] as? [String: Any] {
+          configuration.customPaymentMethodConfiguration = buildCustomPaymentMethodConfiguration(
+            from: customPaymentMethodConfig,
+            sdkImpl: self
+          )
+        }
 
         return (nil, configuration)
     }
@@ -372,5 +376,105 @@ extension StripeSdkImpl {
             return .automatic
         }
     }
+
+    // MARK: - Common Custom Payment Method Helper
+    
+    // Simple data structure for parsed custom payment method data
+    struct ParsedCustomPaymentMethod {
+      let id: String
+      let subtitle: String?
+      let disableBillingDetailCollection: Bool
+    }
+    
+    // Simple parser that extracts data without type complexity
+    static func parseCustomPaymentMethods(from config: [String: Any]) -> [ParsedCustomPaymentMethod] {
+      guard let customMethods = config["customPaymentMethods"] as? [[String: Any]],
+            !customMethods.isEmpty else { return [] }
+      
+      return customMethods.compactMap { methodDict in
+        guard let id = methodDict["id"] as? String else { return nil }
+        let subtitle = methodDict["subtitle"] as? String
+        let disableBillingDetailCollection = methodDict["disableBillingDetailCollection"] as? Bool ?? true
+        
+        return ParsedCustomPaymentMethod(
+          id: id,
+          subtitle: subtitle,
+          disableBillingDetailCollection: disableBillingDetailCollection
+        )
+      }
+    }
+    
+    // Overload for NSDictionary
+    static func parseCustomPaymentMethods(from config: NSDictionary) -> [ParsedCustomPaymentMethod] {
+      guard let customPaymentMethods = config["customPaymentMethods"] as? NSArray,
+            customPaymentMethods.count > 0 else { return [] }
+      
+      var parsedMethods: [ParsedCustomPaymentMethod] = []
+      
+      for customPaymentMethodData in customPaymentMethods {
+        if let customPaymentMethodDict = customPaymentMethodData as? NSDictionary,
+           let id = customPaymentMethodDict["id"] as? String {
+          let subtitle = customPaymentMethodDict["subtitle"] as? String
+          let disableBillingDetailCollection = customPaymentMethodDict["disableBillingDetailCollection"] as? Bool ?? true
+          
+          parsedMethods.append(ParsedCustomPaymentMethod(
+            id: id,
+            subtitle: subtitle,
+            disableBillingDetailCollection: disableBillingDetailCollection
+          ))
+        }
+      }
+      
+      return parsedMethods
+    }
+    
+    private static func buildCustomPaymentMethodConfiguration(
+      from config: [String: Any],
+      sdkImpl: StripeSdkImpl
+    ) -> PaymentSheet.CustomPaymentMethodConfiguration? {
+      let parsedMethods = parseCustomPaymentMethods(from: config)
+      guard !parsedMethods.isEmpty else { return nil }
+      
+      let customMethods = parsedMethods.map { parsed in
+        PaymentSheet.CustomPaymentMethod(
+          id: parsed.id,
+          subtitle: parsed.subtitle,
+          disableBillingDetailCollection: parsed.disableBillingDetailCollection
+        )
+      }
+      
+      return .init(
+        customPaymentMethods: customMethods,
+        customPaymentMethodConfirmHandler: createCustomPaymentMethodConfirmHandler(sdkImpl: sdkImpl)
+      )
+    }
+
+    // MARK: - Common Custom Payment Method Handler
+
+    static func createCustomPaymentMethodConfirmHandler(
+      sdkImpl: StripeSdkImpl?
+    ) -> (Any, PaymentSheet.BillingDetails) -> PaymentSheet.CustomPaymentMethodConfirmResult {
+      return { customPaymentMethod, billingDetails in
+        // Send event to JS with the custom payment method data
+        let customPaymentMethodDict: [String: Any] = [
+          "id": (customPaymentMethod as AnyObject).value(forKey: "id") as? String ?? "",
+          "subtitle": (customPaymentMethod as AnyObject).value(forKey: "subtitle") as Any,
+          "disableBillingDetailCollection": (customPaymentMethod as AnyObject).value(forKey: "disableBillingDetailCollection") as? Bool ?? true
+        ]
+        
+        let billingDetailsDict = Mappers.mapFromBillingDetails(billingDetails: billingDetails) as [String: Any]
+        
+        let payload: [String: Any] = [
+          "customPaymentMethod": customPaymentMethodDict,
+          "billingDetails": billingDetailsDict
+        ]
+        
+        sdkImpl?.emitter?.emitEmbeddedPaymentElementCustomPaymentMethodConfirm(payload)
+        
+        // Return completed immediately since we're using event-based approach
+        return .completed
+      }
+    }
 }
+
 

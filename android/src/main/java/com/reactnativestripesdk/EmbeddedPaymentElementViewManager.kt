@@ -6,6 +6,7 @@ import com.facebook.react.bridge.Dynamic
 import com.facebook.react.bridge.ReadableArray
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewGroupManager
@@ -23,6 +24,7 @@ import com.stripe.android.ExperimentalAllowsRemovalOfLastSavedPaymentMethodApi
 import com.stripe.android.paymentelement.EmbeddedPaymentElement
 import com.stripe.android.paymentelement.ExperimentalEmbeddedPaymentElementApi
 import com.stripe.android.paymentsheet.PaymentSheet
+import com.stripe.android.paymentsheet.ExperimentalCustomPaymentMethodsApi
 
 @OptIn(ExperimentalEmbeddedPaymentElementApi::class)
 @ReactModule(name = EmbeddedPaymentElementViewManager.NAME)
@@ -79,7 +81,7 @@ class EmbeddedPaymentElementViewManager :
   }
 
   @SuppressLint("RestrictedApi")
-  @OptIn(ExperimentalAllowsRemovalOfLastSavedPaymentMethodApi::class)
+  @OptIn(ExperimentalAllowsRemovalOfLastSavedPaymentMethodApi::class, ExperimentalCustomPaymentMethodsApi::class)
   private fun parseElementConfiguration(
     map: ReadableMap,
     context: Context,
@@ -164,6 +166,16 @@ class EmbeddedPaymentElementViewManager :
         }
         ?: EmbeddedPaymentElement.FormSheetAction.Continue
 
+    // Parse custom payment method configuration
+    val customPaymentMethodConfiguration = if (map.hasKey("customPaymentMethodConfiguration")) {
+      PaymentSheetFragment.buildCustomPaymentMethodConfiguration(
+        customConfig = toBundleObject(map.getMap("customPaymentMethodConfiguration")),
+        context = (context as ThemedReactContext).reactApplicationContext
+      )
+    } else {
+      null
+    }
+
     val configurationBuilder =
       EmbeddedPaymentElement.Configuration
         .Builder(merchantDisplayName)
@@ -186,6 +198,7 @@ class EmbeddedPaymentElementViewManager :
 
     primaryButtonLabel?.let { configurationBuilder.primaryButtonLabel(it) }
     paymentMethodOrder?.let { configurationBuilder.paymentMethodOrder(it) }
+    customPaymentMethodConfiguration?.let { configurationBuilder.customPaymentMethodConfiguration(it) }
 
     return configurationBuilder.build()
   }

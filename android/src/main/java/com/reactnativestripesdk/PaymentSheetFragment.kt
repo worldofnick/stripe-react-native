@@ -39,6 +39,8 @@ import com.stripe.android.paymentsheet.PaymentOptionCallback
 import com.stripe.android.paymentsheet.PaymentSheet
 import com.stripe.android.paymentsheet.PaymentSheetResult
 import com.stripe.android.paymentsheet.PaymentSheetResultCallback
+import com.stripe.android.paymentsheet.ExperimentalCustomPaymentMethodsApi
+import com.reactnativestripesdk.utils.mapFromPaymentSheetBillingDetails
 import kotlinx.coroutines.CompletableDeferred
 import java.io.ByteArrayOutputStream
 import kotlin.Exception
@@ -246,6 +248,11 @@ class PaymentSheetFragment : StripeFragment() {
       mapToPaymentMethodLayout(arguments?.getString("paymentMethodLayout")),
     )
 
+    // Parse custom payment method configuration
+    parseCustomPaymentMethodConfiguration(arguments)?.let { customConfig ->
+      configurationBuilder.customPaymentMethodConfiguration(customConfig)
+    }
+
     paymentSheetConfiguration = configurationBuilder.build()
 
     if (arguments?.getBoolean("customFlow") == true) {
@@ -418,6 +425,14 @@ class PaymentSheetFragment : StripeFragment() {
     } ?: run { resolvePresentPromise(map) }
   }
 
+  @OptIn(ExperimentalCustomPaymentMethodsApi::class)
+  private fun parseCustomPaymentMethodConfiguration(arguments: Bundle?): PaymentSheet.CustomPaymentMethodConfiguration? {
+    return buildCustomPaymentMethodConfiguration(
+      customConfig = arguments?.getBundle("customPaymentMethodConfiguration"),
+      context = context
+    )
+  }
+
   companion object {
     internal const val TAG = "payment_sheet_launch_fragment"
 
@@ -570,6 +585,58 @@ class PaymentSheetFragment : StripeFragment() {
       } else {
         null
       }
+    }
+
+    @OptIn(ExperimentalCustomPaymentMethodsApi::class)
+    internal fun buildCustomPaymentMethodConfiguration(
+      customConfig: Bundle?,
+      context: ReactApplicationContext
+    ): PaymentSheet.CustomPaymentMethodConfiguration? {
+      if (customConfig == null) return null
+
+      val customMethodsBundle = customConfig.getParcelableArrayList<Bundle>("customPaymentMethods")
+      if (customMethodsBundle.isNullOrEmpty()) return null
+
+      val customMethods = customMethodsBundle.mapNotNull { methodBundle ->
+        val id = methodBundle.getString("id") ?: return@mapNotNull null
+        val subtitle = methodBundle.getString("subtitle")
+        val disableBillingDetailCollection = methodBundle.getBoolean("disableBillingDetailCollection", true)
+        
+        PaymentSheet.CustomPaymentMethod(
+          id = id,
+          subtitle = subtitle,
+          disableBillingDetailCollection = disableBillingDetailCollection
+        )
+      }
+
+      if (customMethods.isEmpty()) return null
+
+      return PaymentSheet.CustomPaymentMethodConfiguration(
+        customPaymentMethods = customMethods,
+        onConfirm = { customPaymentMethod, billingDetails ->
+          // Create the event data using the existing helper
+          val customPaymentMethodMap = Arguments.createMap().apply {
+            putString("id", customPaymentMethod.id)
+            putString("subtitle", customPaymentMethod.subtitle)
+            putBoolean("disableBillingDetailCollection", customPaymentMethod.disableBillingDetailCollection)
+          }
+          
+          val billingDetailsMap = mapFromPaymentSheetBillingDetails(billingDetails)
+          
+          val eventData = Arguments.createMap().apply {
+            putMap("customPaymentMethod", customPaymentMethodMap)
+            putMap("billingDetails", billingDetailsMap)
+          }
+          
+          // Emit the event to JavaScript
+          try {
+            val stripeSdkModule = context.getNativeModule(StripeSdkModule::class.java)
+            stripeSdkModule?.emitEmbeddedPaymentElementCustomPaymentMethodConfirm(eventData)
+          } catch (e: Exception) {
+            // Handle error - could not emit event
+          }
+        }
+      )
     }
   }
 }

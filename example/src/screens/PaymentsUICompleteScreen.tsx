@@ -8,6 +8,8 @@ import {
   PaymentMethodLayout,
   PaymentSheetError,
   useStripe,
+  CustomPaymentMethod,
+  CustomPaymentMethodResult,
 } from '@stripe/stripe-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
@@ -141,6 +143,42 @@ export default function PaymentsUICompleteScreen() {
         paymentMethodLayout: PaymentMethodLayout.Automatic,
         removeSavedPaymentMethodMessage: 'remove this payment method?',
         preferredNetworks: [CardBrand.Amex, CardBrand.Visa],
+        customPaymentMethodConfiguration: {
+          customPaymentMethods: [
+            {
+              id: 'cpmt_1QpIMNLu5o3P18Zpwln1Sm6I', // Same ID as embedded screen
+              subtitle: 'Demo custom payment method',
+              disableBillingDetailCollection: false,
+            },
+          ],
+          confirmCustomPaymentMethodCallback: (
+            customPaymentMethod: CustomPaymentMethod,
+            billingDetails: BillingDetails,
+            resultHandler: (result: CustomPaymentMethodResult) => void
+          ) => {
+            // Show an alert to simulate custom payment method processing
+            Alert.alert(
+              'Custom Payment Method',
+              `Processing payment with ${customPaymentMethod.id}`,
+              [
+                {
+                  text: 'Success',
+                  onPress: () => resultHandler({ status: 'completed' }),
+                },
+                {
+                  text: 'Fail',
+                  style: 'destructive',
+                  onPress: () => resultHandler({ status: 'failed', error: 'Custom payment failed' }),
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => resultHandler({ status: 'canceled' }),
+                },
+              ]
+            );
+          },
+        },
         ...clientSecretParams,
       });
       if (!error) {
@@ -174,7 +212,7 @@ export default function PaymentsUICompleteScreen() {
   }, [customerKeyType, initialisePaymentSheet]);
 
   return (
-    // In your app’s checkout, make a network request to the backend and initialize PaymentSheet.
+    // In your app's checkout, make a network request to the backend and initialize PaymentSheet.
     // To reduce loading time, make this request before the Checkout button is tapped, e.g. when the screen is loaded.
     <PaymentScreen>
       <Button

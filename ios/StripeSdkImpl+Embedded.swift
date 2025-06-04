@@ -6,7 +6,7 @@
 //
 
 import Foundation
-@_spi(EmbeddedPaymentElementPrivateBeta) @_spi(ExperimentalAllowsRemovalOfLastSavedPaymentMethodAPI) @_spi(CustomerSessionBetaAccess) @_spi(STP) import StripePaymentSheet
+@_spi(EmbeddedPaymentElementPrivateBeta) @_spi(ExperimentalAllowsRemovalOfLastSavedPaymentMethodAPI) @_spi(CustomerSessionBetaAccess) @_spi(STP) @_spi(CustomPaymentMethodsBeta) import StripePaymentSheet
 
 @objc(StripeSdkImpl)
 extension StripeSdkImpl {
@@ -318,6 +318,27 @@ extension StripeSdkImpl {
           // Replace the event name and body details as needed.
           self?.emitter?.emitEmbeddedPaymentElementRowSelectionImmediateAction()
         }
+      }
+    }
+
+    // Parse custom payment method configuration
+    if let customPaymentMethodConfig = params["customPaymentMethodConfiguration"] as? NSDictionary {
+      let parsedMethods = StripeSdkImpl.parseCustomPaymentMethods(from: customPaymentMethodConfig)
+      
+      if !parsedMethods.isEmpty {
+        let customMethods = parsedMethods.map { parsed in
+          var customPaymentMethod = EmbeddedPaymentElement.CustomPaymentMethodConfiguration.CustomPaymentMethod(
+            id: parsed.id,
+            subtitle: parsed.subtitle
+          )
+          customPaymentMethod.disableBillingDetailCollection = parsed.disableBillingDetailCollection
+          return customPaymentMethod
+        }
+        
+        configuration.customPaymentMethodConfiguration = .init(
+          customPaymentMethods: customMethods,
+          customPaymentMethodConfirmHandler: StripeSdkImpl.createCustomPaymentMethodConfirmHandler(sdkImpl: self)
+        )
       }
     }
 

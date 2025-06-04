@@ -13,6 +13,9 @@ import type {
   IntentCreationCallbackParams,
   PaymentMethod,
   EmbeddedPaymentElementResult,
+  CustomPaymentMethod,
+  CustomPaymentMethodResult,
+  ConfirmCustomPaymentMethodCallback,
 } from '@stripe/stripe-react-native';
 import {
   useEmbeddedPaymentElement,
@@ -235,6 +238,42 @@ export default function EmbeddedPaymentElementScreen() {
             else if (result.status === 'failed')
               Alert.alert('Error', `Failed: ${result.error.message}`);
             else Alert.alert('Cancelled');
+          },
+        },
+        customPaymentMethodConfiguration: {
+          customPaymentMethods: [
+            {
+              id: 'cpmt_1QpIMNLu5o3P18Zpwln1Sm6I', // The requested custom payment method ID
+              subtitle: 'Demo custom payment method',
+              disableBillingDetailCollection: false,
+            },
+          ],
+          confirmCustomPaymentMethodCallback: (
+            customPaymentMethod: CustomPaymentMethod,
+            billingDetails: BillingDetails,
+            resultHandler: (result: CustomPaymentMethodResult) => void
+          ) => {
+            // Show an alert to simulate custom payment method processing
+            Alert.alert(
+              'Custom Payment Method',
+              `Processing payment with ${customPaymentMethod.id}`,
+              [
+                {
+                  text: 'Success',
+                  onPress: () => resultHandler({ status: 'completed' }),
+                },
+                {
+                  text: 'Fail',
+                  style: 'destructive',
+                  onPress: () => resultHandler({ status: 'failed', error: 'Custom payment failed' }),
+                },
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                  onPress: () => resultHandler({ status: 'canceled' }),
+                },
+              ]
+            );
           },
         },
         appearance,
