@@ -15,6 +15,7 @@ import type {
   EmbeddedPaymentElementResult,
   CustomPaymentMethod,
   CustomPaymentMethodResult,
+  CustomPaymentMethodResultStatus,
   ConfirmCustomPaymentMethodCallback,
 } from '@stripe/stripe-react-native';
 import {
@@ -260,17 +261,17 @@ export default function EmbeddedPaymentElementScreen() {
               [
                 {
                   text: 'Success',
-                  onPress: () => resultHandler({ status: 'completed' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Completed }),
                 },
                 {
                   text: 'Fail',
                   style: 'destructive',
-                  onPress: () => resultHandler({ status: 'failed', error: 'Custom payment failed' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Failed, error: 'Custom payment failed' }),
                 },
                 {
                   text: 'Cancel',
                   style: 'cancel',
-                  onPress: () => resultHandler({ status: 'canceled' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Canceled }),
                 },
               ]
             );

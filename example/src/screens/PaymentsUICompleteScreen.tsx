@@ -10,6 +10,7 @@ import {
   useStripe,
   CustomPaymentMethod,
   CustomPaymentMethodResult,
+  CustomPaymentMethodResultStatus,
 } from '@stripe/stripe-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
@@ -163,17 +164,17 @@ export default function PaymentsUICompleteScreen() {
               [
                 {
                   text: 'Success',
-                  onPress: () => resultHandler({ status: 'completed' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Completed }),
                 },
                 {
                   text: 'Fail',
                   style: 'destructive',
-                  onPress: () => resultHandler({ status: 'failed', error: 'Custom payment failed' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Failed, error: 'Custom payment failed' }),
                 },
                 {
                   text: 'Cancel',
                   style: 'cancel',
-                  onPress: () => resultHandler({ status: 'canceled' }),
+                  onPress: () => resultHandler({ status: CustomPaymentMethodResultStatus.Canceled }),
                 },
               ]
             );

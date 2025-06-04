@@ -541,10 +541,19 @@ export interface CustomPaymentMethod {
 /**
  * Custom payment method confirmation result type for PaymentSheet.
  */
+export enum CustomPaymentMethodResultStatus {
+  /** The custom payment method transaction was completed successfully */
+  Completed = 'completed',
+  /** The custom payment method transaction was canceled by the user */
+  Canceled = 'canceled', 
+  /** The custom payment method transaction failed */
+  Failed = 'failed',
+}
+
 export type CustomPaymentMethodResult =
-  | { status: 'completed' }
-  | { status: 'canceled' }
-  | { status: 'failed'; error: string };
+  | { status: CustomPaymentMethodResultStatus.Completed }
+  | { status: CustomPaymentMethodResultStatus.Canceled }
+  | { status: CustomPaymentMethodResultStatus.Failed; error: string };
 
 /**
  * Callback function called when a custom payment method is selected and confirmed.
