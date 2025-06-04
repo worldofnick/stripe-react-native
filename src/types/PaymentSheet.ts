@@ -565,7 +565,7 @@ export type CustomPaymentMethodResult =
  */
 export type ConfirmCustomPaymentMethodCallback = (
   customPaymentMethod: CustomPaymentMethod,
-  billingDetails: BillingDetails,
+  billingDetails: BillingDetails | null,
   /** 
    * Call this function with the result of your custom payment method transaction.
    * @param result The result of the custom payment method confirmation

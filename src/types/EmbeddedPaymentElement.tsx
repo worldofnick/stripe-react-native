@@ -278,7 +278,7 @@ function setupConfirmHandlers(
           billingDetails,
         }: {
           customPaymentMethod: PaymentSheetTypes.CustomPaymentMethod;
-          billingDetails: BillingDetails;
+          billingDetails: BillingDetails | null;
         }) => {
           // Call the user's handler with a result handler callback
           customPaymentMethodHandler(

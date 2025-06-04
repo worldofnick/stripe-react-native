@@ -251,13 +251,17 @@ export default function EmbeddedPaymentElementScreen() {
           ],
           confirmCustomPaymentMethodCallback: (
             customPaymentMethod: CustomPaymentMethod,
-            billingDetails: BillingDetails,
+            billingDetails: BillingDetails | null,
             resultHandler: (result: CustomPaymentMethodResult) => void
           ) => {
             // Show an alert to simulate custom payment method processing
+            const billingInfo = billingDetails 
+              ? `with billing details for ${billingDetails.name || 'unknown customer'}`
+              : 'without billing details';
+            
             Alert.alert(
               'Custom Payment Method',
-              `Processing payment with ${customPaymentMethod.id}`,
+              `Processing payment with ${customPaymentMethod.id} ${billingInfo}`,
               [
                 {
                   text: 'Success',
