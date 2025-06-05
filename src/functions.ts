@@ -352,6 +352,7 @@ export const verifyMicrodepositsForSetup = async (
 let confirmHandlerCallback: EventSubscription | null = null;
 let orderTrackingCallbackListener: EventSubscription | null = null;
 let financialConnectionsEventListener: EventSubscription | null = null;
+let paymentSheetCustomPaymentMethodConfirmCallback: EventSubscription | null = null;
 
 export const initPaymentSheet = async (
   params: PaymentSheet.SetupParams
@@ -381,6 +382,34 @@ export const initPaymentSheet = async (
         orderTrackingCallback(NativeStripeSdk.configureOrderTracking);
       }
     );
+  }
+
+  // Setup custom payment method confirmation handler for PaymentSheet
+  if (params.customPaymentMethodConfiguration) {
+    const customPaymentMethodHandler = params.customPaymentMethodConfiguration.confirmCustomPaymentMethodCallback;
+    if (customPaymentMethodHandler) {
+      paymentSheetCustomPaymentMethodConfirmCallback?.remove();
+      paymentSheetCustomPaymentMethodConfirmCallback = addListener(
+        'embeddedPaymentElementCustomPaymentMethodConfirm',
+        ({
+          customPaymentMethod,
+          billingDetails,
+        }: {
+          customPaymentMethod: PaymentSheet.CustomPaymentMethod;
+          billingDetails: import('./types').BillingDetails | null;
+        }) => {
+          // Call the user's handler with a result handler callback
+          customPaymentMethodHandler(
+            customPaymentMethod,
+            billingDetails,
+            (result: PaymentSheet.CustomPaymentMethodResult) => {
+              // Send the result back to the native side
+              NativeStripeSdk.customPaymentMethodResultCallback(result);
+            }
+          );
+        }
+      );
+    }
   }
 
   try {
@@ -860,7 +889,7 @@ export const updatePlatformPaySheet = async (params: {
 /**
  * iOS only, this is a no-op on Android. Use this method to move users to the interface for adding credit cards.
  * This method transfers control to the Wallet app on iPhone or to the Settings
- * app on iPad. For devices that don’t support Apple Pay, this method does nothing.
+ * app on iPad. For devices that don't support Apple Pay, this method does nothing.
  */
 export const openPlatformPaySetup = async (): Promise<void> => {
   if (Platform.OS === 'ios') {

@@ -17,6 +17,7 @@ public class StripeSdkImpl: NSObject, UIAdaptivePresentationControllerDelegate {
     internal var paymentSheet: PaymentSheet?
     internal var paymentSheetFlowController: PaymentSheet.FlowController?
     var paymentSheetIntentCreationCallback: ((Result<String, Error>) -> Void)?
+    var customPaymentMethodResultCallback: ((PaymentSheet.CustomPaymentMethodConfirmResult) -> Void)?
 
     var urlScheme: String? = nil
 
@@ -118,27 +119,54 @@ public class StripeSdkImpl: NSObject, UIAdaptivePresentationControllerDelegate {
 
     @objc(intentCreationCallback:resolver:rejecter:)
     @MainActor public func intentCreationCallback(result: NSDictionary, resolver resolve: @escaping RCTPromiseResolveBlock,
-                          rejecter reject: @escaping RCTPromiseRejectBlock) -> Void  {
+                          rejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
         guard let paymentSheetIntentCreationCallback = self.paymentSheetIntentCreationCallback else {
-            resolve(Errors.createError(ErrorType.Failed, "No intent creation callback was set"))
+            resolve(Errors.createError(ErrorType.Failed, "Internal error"))
             return
         }
+
         if let clientSecret = result["clientSecret"] as? String {
             paymentSheetIntentCreationCallback(.success(clientSecret))
+        } else if let errorDict = result["error"] as? NSDictionary {
+            let code = errorDict["code"] as? String ?? ""
+            let message = errorDict["message"] as? String ?? ""
+            let localizedMessage = errorDict["localizedMessage"] as? String ?? ""
+
+            let userInfo = [NSLocalizedDescriptionKey: localizedMessage, "code": code]
+            let error = NSError(domain: "StripePayments", code: 0, userInfo: userInfo)
+
+            paymentSheetIntentCreationCallback(.failure(error))
         } else {
-          struct ConfirmationError: Error, LocalizedError {
-            private var errorMessage: String
-            init(errorMessage: String) {
-              self.errorMessage = errorMessage
-            }
-            public var errorDescription: String? {
-              return errorMessage
-            }
-          }
-          let errorParams = result["error"] as? NSDictionary
-          let error = ConfirmationError.init(errorMessage: errorParams?["localizedMessage"] as? String ?? "An unknown error occurred.")
-          paymentSheetIntentCreationCallback(.failure(error))
+            let error = NSError(domain: "StripePayments", code: 0, userInfo: [NSLocalizedDescriptionKey: "Unknown error occurred"])
+            paymentSheetIntentCreationCallback(.failure(error))
         }
+
+        resolve(NSNull())
+    }
+
+    @objc(customPaymentMethodResultCallback:resolver:rejecter:)
+    @MainActor public func customPaymentMethodResultCallback(result: NSDictionary, resolver resolve: @escaping RCTPromiseResolveBlock,
+                          rejecter reject: @escaping RCTPromiseRejectBlock) -> Void {
+        guard let customPaymentMethodResultCallback = self.customPaymentMethodResultCallback else {
+            resolve(Errors.createError(ErrorType.Failed, "Internal error: no custom payment method callback"))
+            return
+        }
+
+        let status = result["status"] as? String ?? ""
+        let errorMessage = result["error"] as? String
+
+        switch status {
+        case "completed":
+            customPaymentMethodResultCallback(.completed)
+        case "canceled":
+            customPaymentMethodResultCallback(.canceled)
+        case "failed":
+            customPaymentMethodResultCallback(.failed(error: errorMessage ?? "Custom payment method failed"))
+        default:
+            customPaymentMethodResultCallback(.failed(error: "Unknown custom payment method result status"))
+        }
+
+        resolve(NSNull())
     }
 
     @objc(confirmPaymentSheetPayment:rejecter:)

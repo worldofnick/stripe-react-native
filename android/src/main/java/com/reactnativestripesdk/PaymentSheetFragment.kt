@@ -44,6 +44,7 @@ import com.reactnativestripesdk.utils.mapFromPaymentSheetBillingDetails
 import kotlinx.coroutines.CompletableDeferred
 import java.io.ByteArrayOutputStream
 import kotlin.Exception
+import kotlinx.coroutines.runBlocking
 
 @OptIn(ExperimentalAllowsRemovalOfLastSavedPaymentMethodApi::class)
 class PaymentSheetFragment : StripeFragment() {
@@ -59,6 +60,7 @@ class PaymentSheetFragment : StripeFragment() {
   private var presentPromise: Promise? = null
   private var paymentSheetTimedOut = false
   internal var paymentSheetIntentCreationCallback = CompletableDeferred<ReadableMap>()
+  internal var customPaymentMethodResultCallback = CompletableDeferred<ReadableMap>()
   private var keepJsAwake: KeepJsAwakeTask? = null
 
   override fun prepare() {
@@ -628,12 +630,35 @@ class PaymentSheetFragment : StripeFragment() {
             putMap("billingDetails", billingDetailsMap)
           }
           
-          // Emit the event to JavaScript
+          // Emit the event to JavaScript and wait for result
           try {
             val stripeSdkModule = context.getNativeModule(StripeSdkModule::class.java)
             stripeSdkModule?.emitEmbeddedPaymentElementCustomPaymentMethodConfirm(eventData)
+            
+            // Wait for JavaScript callback result
+            runBlocking {
+              try {
+                val resultFromJavascript = stripeSdkModule?.customPaymentMethodResultCallback?.await()
+                // Reset the completable for next use
+                stripeSdkModule?.customPaymentMethodResultCallback = CompletableDeferred<ReadableMap>()
+                
+                val status = resultFromJavascript?.getString("status")
+                when (status) {
+                  "completed" -> PaymentSheet.CustomPaymentMethodConfirmResult.Completed
+                  "canceled" -> PaymentSheet.CustomPaymentMethodConfirmResult.Canceled
+                  "failed" -> {
+                    val errorMessage = resultFromJavascript.getString("error") ?: "Custom payment method failed"
+                    PaymentSheet.CustomPaymentMethodConfirmResult.Failed(errorMessage)
+                  }
+                  else -> PaymentSheet.CustomPaymentMethodConfirmResult.Failed("Unknown custom payment method result status")
+                }
+              } catch (e: Exception) {
+                PaymentSheet.CustomPaymentMethodConfirmResult.Failed("Custom payment method confirmation failed: ${e.message}")
+              }
+            }
           } catch (e: Exception) {
             // Handle error - could not emit event
+            PaymentSheet.CustomPaymentMethodConfirmResult.Failed("Failed to emit custom payment method event: ${e.message}")
           }
         }
       )

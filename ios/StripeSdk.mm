@@ -275,10 +275,17 @@ RCT_EXPORT_METHOD(initialise:(nonnull NSDictionary *)params
 }
 
 RCT_EXPORT_METHOD(intentCreationCallback:(nonnull NSDictionary *)result
-                                 resolve:(nonnull RCTPromiseResolveBlock)resolve
-                                  reject:(nonnull RCTPromiseRejectBlock)reject)
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
 {
   [StripeSdkImpl.shared intentCreationCallback:result resolver:resolve rejecter:reject];
+}
+
+RCT_EXPORT_METHOD(customPaymentMethodResultCallback:(nonnull NSDictionary *)result
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  [StripeSdkImpl.shared customPaymentMethodResultCallback:result resolver:resolve rejecter:reject];
 }
 
 RCT_EXPORT_METHOD(isCardInWallet:(nonnull NSDictionary *)params

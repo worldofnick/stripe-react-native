@@ -471,8 +471,25 @@ extension StripeSdkImpl {
         
         sdkImpl?.emitter?.emitEmbeddedPaymentElementCustomPaymentMethodConfirm(payload)
         
-        // Return completed immediately since we're using event-based approach
-        return .completed
+        // Wait for JavaScript callback result
+        let semaphore = DispatchSemaphore(value: 0)
+        var finalResult: PaymentSheet.CustomPaymentMethodConfirmResult = .failed(error: "Timeout waiting for custom payment method result")
+        
+        sdkImpl?.customPaymentMethodResultCallback = { result in
+          finalResult = result
+          semaphore.signal()
+        }
+        
+        // Wait for callback with timeout (30 seconds)
+        let timeout = DispatchTime.now() + .seconds(30)
+        if semaphore.wait(timeout: timeout) == .timedOut {
+          finalResult = .failed(error: "Custom payment method confirmation timed out")
+        }
+        
+        // Clean up callback
+        sdkImpl?.customPaymentMethodResultCallback = nil
+        
+        return finalResult
       }
     }
 }

@@ -285,8 +285,8 @@ function setupConfirmHandlers(
             customPaymentMethod,
             billingDetails,
             (result: PaymentSheetTypes.CustomPaymentMethodResult) => {
-              // For now, we just call the handler and let the native side handle the flow
-              // In the future, this could be enhanced to send results back to native if needed
+              // Send the result back to the native side
+              NativeStripeSdkModule.customPaymentMethodResultCallback(result);
             }
           );
         }
